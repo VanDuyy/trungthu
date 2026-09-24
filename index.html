@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Đêm Hội Trung Thu 3D - Full Code</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Plus Jakarta Sans', sans-serif; background-color: #020208; touch-action: none; }
+        canvas { display: block; }
+        .glass-modal {
+            background: rgba(15, 10, 28, 0.94);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(245, 158, 11, 0.4);
+            box-shadow: 0 0 40px rgba(245, 158, 11, 0.35);
+        }
+    </style>
+</head>
+<body class="relative w-screen h-screen select-none">
+
+    <div id="canvas-container" class="w-full h-full"></div>
+
+    <div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 text-center pointer-events-none w-11/12 max-w-md">
+        <p class="text-amber-200/90 text-xs md:text-sm bg-black/70 px-4 py-2.5 rounded-full border border-amber-500/30 backdrop-blur-md shadow-lg">
+            Chạm lồng đèn để xem câu chúc Trung Thu ✨
+        </p>
+    </div>
+
+    <div class="absolute top-6 right-6 z-10 flex gap-3">
+        <button id="music-btn" class="w-11 h-11 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 flex items-center justify-center backdrop-blur-md hover:bg-amber-500/40 transition-all shadow-lg text-lg">
+            🎵
+        </button>
+    </div>
+
+    <div id="modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden opacity-0 pointer-events-none transition-all duration-300">
+        <div id="modal-card" class="glass-modal max-w-sm w-full rounded-2xl p-6 text-center relative transform scale-90 transition-all duration-300">
+            <button onclick="closeModal()" class="absolute top-3 right-3 text-amber-400/80 hover:text-amber-300 text-lg w-8 h-8 flex items-center justify-center rounded-full bg-black/40">✕</button>
+            <h3 class="text-amber-300 font-bold text-lg mb-3 tracking-wide">Gửi cậu ❤️</h3>
+            <div class="w-full h-40 rounded-xl overflow-hidden mb-4 border border-amber-500/30 shadow-inner">
+                <img src="https://images.unsplash.com/photo-1532693322450-2cb5c511067d?q=80&w=600&auto=format&fit=crop" class="w-full h-full object-cover" alt="Mid autumn night">
+            </div>
+            <p id="wish-text" class="text-slate-100 text-sm leading-relaxed mb-4 italic font-medium">
+                "Trăng trong trọc trăng soi bóng nước, chúc cậu bình an vô sự thuộc về tớ."
+            </p>
+            <div class="inline-block px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30">
+                <span class="text-[11px] text-amber-300 font-semibold tracking-wider">✦ TRUNG THU AN LÀNH ✦</span>
+            </div>
+        </div>
+    </div>
+
+    <audio id="bg-audio" loop crossorigin="anonymous" src="https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3"></audio>
+
+    <script>
+        // --- 1. SETUP THREE.JS SCENE ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x020208, 0.011);
+
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 4, 23);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.15;
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxDistance = 38;
+        controls.minDistance = 8;
+        controls.maxPolarAngle = Math.PI / 2 - 0.05;
+
+        // --- 2. BLOOM GLOW ---
+        const renderScene = new THREE.RenderPass(scene, camera);
+        const bloomPass = new THREE.UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            0.85, 0.4, 0.2
+        );
+        const composer = new THREE.EffectComposer(renderer);
+        composer.addPass(renderScene);
+        composer.addPass(bloomPass);
+
+        // --- 3. LIGHTING ---
+        scene.add(new THREE.AmbientLight(0x332244, 1.5));
+        const dirLight = new THREE.DirectionalLight(0xffddaa, 1.2);
+        dirLight.position.set(5, 12, 8);
+        scene.add(dirLight);
+
+        const centerPinkLight = new THREE.PointLight(0xeb6b9d, 2.5, 22);
+        centerPinkLight.position.set(0, 4, 0);
+        scene.add(centerPinkLight);
+
+        // --- 4. FLOATING ISLAND ---
+        const islandGroup = new THREE.Group();
+
+        const rockGeo = new THREE.CylinderGeometry(5.8, 0.8, 4.8, 24, 12);
+        const rockPos = rockGeo.attributes.position;
+        for (let i = 0; i < rockPos.count; i++) {
+            let x = rockPos.getX(i), y = rockPos.getY(i), z = rockPos.getZ(i);
+            if (y < 0) {
+                let noise = (Math.sin(x * 2.5) + Math.cos(z * 2.5)) * 0.35;
+                rockPos.setX(i, x + noise * 0.4);
+                rockPos.setZ(i, z + noise * 0.4);
+            }
+            rockPos.setY(i, y + (Math.sin(y * 4) + Math.cos(x * 3)) * 0.15);
+        }
+        rockGeo.computeVertexNormals();
+
+        const rock = new THREE.Mesh(rockGeo, new THREE.MeshStandardMaterial({ color: 0x1f192b, roughness: 0.95, flatShading: true }));
+        rock.position.y = -2.4;
+        islandGroup.add(rock);
+
+        const grass = new THREE.Mesh(new THREE.CylinderGeometry(5.9, 5.7, 0.6, 32, 4), new THREE.MeshStandardMaterial({ color: 0x180f2d, roughness: 0.85 }));
+        grass.position.y = 0.05;
+        islandGroup.add(grass);
+
+        // --- 5. CÂY HOA ---
+        const treeGroup = new THREE.Group();
+        const trunkCurve = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.15, 1.8, 0.1),
+            new THREE.Vector3(-0.25, 3.6, -0.15), new THREE.Vector3(0, 4.8, 0)
+        ]);
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x2d1710, roughness: 0.9 });
+        treeGroup.add(new THREE.Mesh(new THREE.TubeGeometry(trunkCurve, 25, 0.22, 10, false), trunkMat));
+
+        [{ x: 0.35, y: 0.5, z: 0.5, length: 2.8, pos: [0, 2.8, 0] },
+         { x: -0.45, y: -0.8, z: -0.6, length: 2.6, pos: [-0.1, 3.5, 0] },
+         { x: 0.25, y: 2.2, z: -0.4, length: 2.4, pos: [0.1, 4.0, -0.1] }].forEach(b => {
+            const bMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.12, b.length, 8), trunkMat);
+            bMesh.position.set(...b.pos);
+            bMesh.rotation.set(b.x, b.y, b.z);
+            treeGroup.add(bMesh);
+        });
+
+        const particleCount = 8500;
+        const particleGeo = new THREE.BufferGeometry();
+        const positions = new Float32Array(particleCount * 3);
+        const originalY = new Float32Array(particleCount);
+        const clusters = [
+            { x: 0, y: 5.4, z: 0, r: 3.2 }, { x: -2.2, y: 4.8, z: 1.2, r: 2.4 },
+            { x: 2.3, y: 5.0, z: -1.0, r: 2.5 }, { x: 0.8, y: 6.2, z: 1.5, r: 2.3 },
+            { x: -1.2, y: 5.8, z: -1.8, r: 2.3 }, { x: 1.8, y: 4.5, z: 1.8, r: 2.1 }
+        ];
+
+        for (let i = 0; i < particleCount; i++) {
+            const c = clusters[Math.floor(Math.random() * clusters.length)];
+            const u = Math.random(), v = Math.random();
+            const theta = u * 2.0 * Math.PI, phi = Math.acos(2.0 * v - 1.0);
+            const r = Math.cbrt(Math.random()) * c.r;
+
+            positions[i * 3] = c.x + r * Math.sin(phi) * Math.cos(theta);
+            positions[i * 3 + 1] = c.y + r * Math.sin(phi) * Math.sin(theta);
+            positions[i * 3 + 2] = c.z + r * Math.cos(phi);
+            originalY[i] = positions[i * 3 + 1];
+        }
+
+        particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        treeGroup.add(new THREE.Points(particleGeo, new THREE.PointsMaterial({ color: 0xffa3c8, size: 0.24, transparent: true, opacity: 0.85 })));
+
+        // Cánh hoa
+        const petalCount = 150;
+        const petalGeo = new THREE.BufferGeometry();
+        const petalPos = new Float32Array(petalCount * 3);
+        const petalData = [];
+        for(let i = 0; i < petalCount; i++) {
+            petalPos[i*3] = (Math.random() - 0.5) * 8;
+            petalPos[i*3+1] = Math.random() * 5 + 1;
+            petalPos[i*3+2] = (Math.random() - 0.5) * 8;
+            petalData.push({ speedY: 0.006 + Math.random() * 0.01, sway: Math.random() * Math.PI * 2 });
+        }
+        petalGeo.setAttribute('position', new THREE.BufferAttribute(petalPos, 3));
+        treeGroup.add(new THREE.Points(petalGeo, new THREE.PointsMaterial({ color: 0xffbde2, size: 0.15, transparent: true, opacity: 0.75 })));
+        islandGroup.add(treeGroup);
+
+        // --- 6. THỎ ---
+        const rabbits = [];
+        function createCuteRoundRabbit(colorHex) {
+            const rabbit = new THREE.Group();
+            const bodyMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.4 });
+            const body = new THREE.Mesh(new THREE.SphereGeometry(0.32, 16, 16), bodyMat);
+            body.scale.set(1, 0.92, 1.1);
+            body.position.y = 0.3;
+            rabbit.add(body);
+
+            for (let side of [-1, 1]) {
+                const ear = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.06, 0.3, 12), bodyMat);
+                ear.position.set(side * 0.12, 0.65, -0.02);
+                ear.rotation.set(-0.1, 0, side * -0.2);
+                rabbit.add(ear);
+
+                const eye = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 8), new THREE.MeshBasicMaterial({ color: 0x111111 }));
+                eye.position.set(side * 0.11, 0.38, 0.29);
+                rabbit.add(eye);
+
+                const cheek = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff88aa }));
+                cheek.position.set(side * 0.16, 0.32, 0.27);
+                rabbit.add(cheek);
+            }
+            return rabbit;
+        }
+
+        [{ color: 0xffffff, radius: 2.2, speed: 1.2, angleOffset: 0 },
+         { color: 0xd8b4fe, radius: 3.0, speed: 1.0, angleOffset: Math.PI * 0.6 },
+         { color: 0xfef08a, radius: 1.8, speed: 1.4, angleOffset: Math.PI * 1.3 }].forEach(cfg => {
+            const r = createCuteRoundRabbit(cfg.color);
+            r.userData = { radius: cfg.radius, speed: cfg.speed, angle: cfg.angleOffset };
+            islandGroup.add(r);
+            rabbits.push(r);
+        });
+        scene.add(islandGroup);
+
+        // --- 7. LỒNG ĐÈN BAY ---
+        const lanterns = [];
+        const lanternMeshes = [];
+        function createYellowLantern() {
+            const group = new THREE.Group();
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0xffcc00, emissive: 0xff8800, emissiveIntensity: 1.2 });
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.35, 1.2, 12), bodyMat);
+            group.add(body);
+
+            const rimMat = new THREE.MeshStandardMaterial({ color: 0x880000 });
+            const topRim = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.03, 8, 16), rimMat);
+            topRim.rotation.x = Math.PI / 2;
+            topRim.position.y = 0.6;
+            group.add(topRim);
+
+            group.add(new THREE.PointLight(0xffaa00, 1.2, 8));
+            return group;
+        }
+
+        for(let i = 0; i < 35; i++) {
+            const lantern = createYellowLantern();
+            lantern.position.set((Math.random() - 0.5) * 42, Math.random() * 28 - 6, (Math.random() - 0.5) * 42);
+            lantern.userData = { speedY: 0.007 + Math.random() * 0.01, swayOffset: Math.random() * Math.PI * 2 };
+            scene.add(lantern);
+            lanterns.push(lantern);
+            lantern.traverse(c => { if(c.isMesh) lanternMeshes.push(c); });
+        }
+
+        // Bầu trời sao
+        const starGeo = new THREE.BufferGeometry();
+        const starPos = new Float32Array(1200 * 3);
+        for(let i=0; i<1200*3; i++) starPos[i] = (Math.random() - 0.5) * 160;
+        starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+        scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.18 })));
+
+        // --- 8. MUSIC LOGIC ---
+        const musicBtn = document.getElementById('music-btn');
+        const bgAudio = document.getElementById('bg-audio');
+        let isPlaying = false;
+
+        function playMusic() {
+            bgAudio.play().then(() => {
+                isPlaying = true;
+                musicBtn.innerText = '🔊';
+            }).catch(err => console.log("Audio play err:", err));
+        }
+
+        function toggleMusic() {
+            if(isPlaying) {
+                bgAudio.pause();
+                musicBtn.innerText = '🎵';
+                isPlaying = false;
+            } else {
+                playMusic();
+            }
+        }
+
+        // Tự động kích hoạt phát nhạc ở lần chạm/click đầu tiên trên màn hình
+        const handleFirstInteraction = () => {
+            if (!isPlaying) {
+                playMusic();
+            }
+            window.removeEventListener('pointerdown', handleFirstInteraction);
+        };
+        window.addEventListener('pointerdown', handleFirstInteraction);
+
+        musicBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleMusic();
+        });
+
+        // TƯƠNG TÁC CHẠM LỒNG ĐÈN (PointerUp)
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let touchStartX = 0, touchStartY = 0;
+
+        window.addEventListener('pointerdown', (e) => {
+            touchStartX = e.clientX;
+            touchStartY = e.clientY;
+        });
+
+        window.addEventListener('pointerup', (e) => {
+            if (Math.abs(e.clientX - touchStartX) > 8 || Math.abs(e.clientY - touchStartY) > 8) return;
+
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(lanternMeshes);
+
+            if (intersects.length > 0) {
+                openModal(wishes[Math.floor(Math.random() * wishes.length)]);
+            }
+        });
+
+        const wishes = [
+            "Trăng trong trọc trăng soi bóng nước, chúc cậu bình an vô sự thuộc về tớ.",
+            "Trung Thu này trăng tròn hay khuyết không quan trọng, quan trọng là khi nào mình thành một đôi?",
+            "Hằng Nga chỉ ước có Cuội, còn ước nguyện đêm nay của tớ chỉ là có được câu trả lời từ cậu.",
+            "Trung Thu ai cũng thèm phá cỗ, còn tớ thì chỉ thèm tớ vào lòng cậu thôi!",
+            "Bánh dẻo bánh nướng bánh bao, còn tớ thì chỉ muốn làm bánh cưới của cậu thôi!"
+        ];
+
+        const modal = document.getElementById('modal');
+        const modalCard = document.getElementById('modal-card');
+        const wishText = document.getElementById('wish-text');
+
+        function openModal(text) {
+            wishText.innerText = `"${text}"`;
+            modal.classList.remove('hidden', 'pointer-events-none');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modalCard.classList.remove('scale-90');
+                modalCard.classList.add('scale-100');
+            }, 10);
+        }
+
+        function closeModal() {
+            modal.classList.add('opacity-0');
+            modalCard.classList.remove('scale-100');
+            modalCard.classList.add('scale-90');
+            setTimeout(() => modal.classList.add('hidden', 'pointer-events-none'), 300);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // --- 9. ANIMATION LOOP ---
+        let clock = new THREE.Clock();
+        function animate() {
+            requestAnimationFrame(animate);
+            let time = clock.getElapsedTime();
+
+            const posAttr = particleGeo.attributes.position;
+            for (let i = 0; i < particleCount; i++) {
+                posAttr.setY(i, originalY[i] + Math.sin(time * 2.0 + i) * 0.04);
+            }
+            posAttr.needsUpdate = true;
+
+            const pPos = petalGeo.attributes.position;
+            for(let i = 0; i < petalCount; i++) {
+                let y = pPos.getY(i) - petalData[i].speedY;
+                let x = pPos.getX(i) + Math.sin(time + petalData[i].sway) * 0.004;
+                if(y < 0.2) { y = 5.5; x = (Math.random() - 0.5) * 7; }
+                pPos.setY(i, y); pPos.setX(i, x);
+            }
+            pPos.needsUpdate = true;
+
+            rabbits.forEach(r => {
+                r.userData.angle += 0.01 * r.userData.speed;
+                r.position.x = Math.cos(r.userData.angle) * r.userData.radius;
+                r.position.z = Math.sin(r.userData.angle) * r.userData.radius;
+                r.position.y = 0.1 + Math.abs(Math.sin(time * 8.0 * r.userData.speed)) * 0.12;
+                r.rotation.y = -r.userData.angle + Math.PI / 2;
+            });
+
+            lanterns.forEach(l => {
+                l.position.y += l.userData.speedY;
+                l.position.x += Math.sin(time + l.userData.swayOffset) * 0.01;
+                l.rotation.z = Math.sin(time + l.userData.swayOffset) * 0.05;
+                if(l.position.y > 22) l.position.y = -8;
+            });
+
+            controls.update();
+            composer.render();
+        }
+        animate();
+    </script>
+</body>
+</html>
